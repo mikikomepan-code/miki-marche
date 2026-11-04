@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルシェパン原価 & 価格設定シミュレーター</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bakery: {
+                            50: '#fdfbf7',
+                            100: '#f7f2e8',
+                            200: '#efe3d0',
+                            300: '#e3ccad',
+                            400: '#d5b083',
+                            500: '#c59159',
+                            600: '#b47946',
+                            700: '#965e38',
+                            800: '#7a4a31',
+                            900: '#643d2b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-bakery-50 text-gray-800 font-sans antialiased min-h-screen pb-12" x-data="bakeryCalculator()" x-init="initData()">
+
+    <!-- Header Navigation -->
+    <header class="bg-bakery-900 text-white sticky top-0 z-40 shadow-md">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-3">
+                <svg class="w-8 h-8 text-bakery-300 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v10M7 12h10" />
+                </svg>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold tracking-wide">マルシェパン原価 & 価格決定シミュレーター</h1>
+                    <p class="text-[11px] text-bakery-200">材料費計算・出店損益シミュレーション・過去の実績ログ管理</p>
+                </div>
+            </div>
+
+            <!-- Backup & Restore Buttons -->
+            <div class="flex items-center gap-2">
+                <button @click="exportData()" class="bg-bakery-700 hover:bg-bakery-600 text-bakery-100 px-3 py-1.5 rounded-lg text-xs font-medium border border-bakery-600 transition flex items-center gap-1 shadow-sm">
+                    <span>データ保存</span>
+                </button>
+                <label class="bg-bakery-700 hover:bg-bakery-600 text-bakery-100 px-3 py-1.5 rounded-lg text-xs font-medium border border-bakery-600 transition cursor-pointer flex items-center gap-1 shadow-sm">
+                    <span>データ復元</span>
+                    <input type="file" @change="importData($event)" accept=".json" class="hidden">
+                </label>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="max-w-6xl mx-auto px-4 pb-2">
+            <div class="flex bg-bakery-900/50 p-1 rounded-xl gap-1 text-xs font-medium overflow-x-auto">
+                <button @click="activeTab = 'marche'" :class="activeTab === 'marche' ? 'bg-bakery-500 text-white shadow' : 'text-bakery-200 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    マルシェ出店計算
+                </button>
+                <button @click="activeTab = 'history'" :class="activeTab === 'history' ? 'bg-bakery-500 text-white shadow' : 'text-bakery-200 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    出店記録・実績ログ
+                </button>
+                <button @click="activeTab = 'recipes'" :class="activeTab === 'recipes' ? 'bg-bakery-500 text-white shadow' : 'text-bakery-200 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    パンレシピ管理
+                </button>
+                <button @click="activeTab = 'ingredients'" :class="activeTab === 'ingredients' ? 'bg-bakery-500 text-white shadow' : 'text-bakery-200 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    材料マスター DB
+                </button>
+                <button @click="activeTab = 'guide'" :class="activeTab === 'guide' ? 'bg-bakery-500 text-white shadow' : 'text-bakery-200 hover:text-white'" class="px-3 py-1.5 rounded-lg transition whitespace-nowrap">
+                    使い方＆解説ガイド
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 mt-6">
+
+        <!-- TAB 1: MARCHE SIMULATION -->
+        <div x-show="activeTab === 'marche'" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Column (Inputs) -->
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <!-- STEP 1: Event Cost Settings -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-bakery-200">
+                        <div class="flex items-center justify-between mb-4 border-b border-bakery-100 pb-3">
+                            <h2 class="text-base font-bold text-bakery-800 flex items-center gap-2">
+                                <span class="bg-bakery-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                                イベント情報・固定費設定
+                            </h2>
+                            <span class="text-xs text-bakery-500">基本設定と出店コスト</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                            <div class="sm:col-span-2">
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">イベント名 / 出店先</label>
+                                <input type="text" x-model="event.eventName" class="w-full px-3 py-2 border border-bakery-300 rounded-xl focus:ring-2 focus:ring-bakery-500 focus:outline-none bg-bakery-50 font-medium text-sm" placeholder="例：パンマルシェ 2026春">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">出店日</label>
+                                <input type="date" x-model="event.eventDate" class="w-full px-3 py-2 border border-bakery-300 rounded-xl focus:ring-2 focus:ring-bakery-500 focus:outline-none bg-bakery-50 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">基本目標倍率 (全体を一括設定)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" max="10" step="0.1" x-model.number="globalMultiplier" @input="applyGlobalMultiplier()" class="w-24 px-3 py-2 border border-bakery-300 rounded-xl font-bold text-bakery-800 bg-amber-50 text-right">
+                                    <span class="text-xs text-bakery-600">倍 (一括適用)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-bakery-100 pt-3">
+                            <div>
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">出店料 (円)</label>
+                                <input type="number" min="0" step="100" x-model.number="event.entryFee" @input="calculate()" class="w-full px-3 py-2 border border-bakery-300 rounded-xl focus:ring-2 focus:ring-bakery-500 focus:outline-none bg-bakery-50 text-right font-medium">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">交通費・雑費 (円)</label>
+                                <input type="number" min="0" step="100" x-model.number="event.expenses" @input="calculate()" class="w-full px-3 py-2 border border-bakery-300 rounded-xl focus:ring-2 focus:ring-bakery-500 focus:outline-none bg-bakery-50 text-right font-medium">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-bakery-700 mb-1">目標日当・人件費 (円)</label>
+                                <input type="number" min="0" step="500" x-model.number="event.targetWage" @input="calculate()" class="w-full px-3 py-2 border border-bakery-300 rounded-xl focus:ring-2 focus:ring-bakery-500 focus:outline-none bg-bakery-50 text-right font-medium">
+                            </div>
+                        </div>
+
+                        <div class="mt-4 bg-bakery-50 rounded-xl p-3 flex justify-between items-center text-xs sm:text-sm border border-bakery-100">
+                            <span class="text-bakery-700 font-medium">回収に必要な固定コスト合計：</span>
+                            <span class="text-base font-bold text-bakery-900" x-text="formatYen(totalFixedCosts)"></span>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Selected Bread List -->
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-bakery-200">
+                        <div class="flex items-center justify-between mb-4 border-b border-bakery-100 pb-3">
+                            <h2 class="text-base font-bold text-bakery-800 flex items-center gap-2">
+                                <span class="bg-bakery-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                                出品するパンと販売予定数
+                            </h2>
+                            <button @click="showAddBreadMarcheModal = true" class="bg-bakery-700 hover:bg-bakery-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                                ＋ 出品パンを選択
+                            </button>
+                        </div>
+
+                        <!-- Rounding Options -->
+                        <div class="mb-4 bg-amber-50/60 p-3 rounded-xl border border-amber-200/60 flex items-center justify-between text-xs">
+                            <span class="font-medium text-bakery-800">価格の端数処理:</span>
+                            <div class="flex gap-4">
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="radio" name="rounding" value="10" x-model.number="roundingUnit" @change="calculate()" class="text-bakery-600 focus:ring-bakery-500">
+                                    <span class="ml-1 text-bakery-700">10円単位</span>
+                                </label>
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input type="radio" name="rounding" value="50" x-model.number="roundingUnit" @change="calculate()" class="text-bakery-600 focus:ring-bakery-500">
+                                    <span class="ml-1 text-bakery-700 font-bold">50円単位 (推奨)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Bread List -->
+                        <div class="space-y-3">
+                            <template x-for="(item, index) in selectedMarcheItems" :key="index">
+                                <div class="bg-bakery-50/50 rounded-xl p-4 border border-bakery-200 relative hover:border-bakery-300 transition">
+                                    <!-- Delete Button -->
+                                    <button @click="removeBreadFromMarche(index)" class="absolute top-3 right-3 text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition" title="このパンをリストから外す">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+
+                                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pr-8">
+                                        <div class="font-bold text-bakery-900 text-sm flex items-center gap-2">
+                                            <span x-text="item.name"></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                        <div>
+                                            <span class="text-bakery-500 block mb-1">1個原価</span>
+                                            <span class="font-bold text-bakery-900 text-sm" x-text="formatYen(item.unitCost)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="text-bakery-500 block mb-1">目標倍率</span>
+                                            <div class="flex items-center gap-1">
+                                                <input type="number" min="1" max="10" step="0.1" x-model.number="item.multiplier" @input="updateFromMultiplier(item)" class="w-16 px-2 py-1 border border-bakery-300 rounded-lg text-right font-medium">
+                                                <span>倍</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <span class="text-bakery-500 block mb-1">販売予定数 (個)</span>
+                                            <input type="number" min="1" step="1" x-model.number="item.quantity" @input="calculate()" class="w-20 px-2 py-1 border border-bakery-300 rounded-lg text-right font-bold text-bakery-900 bg-white">
+                                        </div>
+                                        <div class="bg-amber-100/70 p-2 rounded-xl text-center border border-amber-200">
+                                            <span class="text-[10px] text-amber-800 font-bold block">おすすめ価格</span>
+                                            <span class="text-base font-extrabold text-amber-900" x-text="formatYen(item.recommendedPrice)"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="selectedMarcheItems.length === 0">
+                                <div class="text-center py-8 text-xs text-bakery-500 border-2 border-dashed border-bakery-200 rounded-xl">
+                                    まだ出品パンが選択されていません。<br>「＋ 出品パンを選択」ボタンを押して登録済みパンを追加してください。
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column (Live Results Dashboard) -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl p-5 shadow-sm border border-bakery-200 space-y-4 sticky top-20">
+                        <h3 class="font-bold text-base text-bakery-800 border-b border-bakery-100 pb-2 flex items-center justify-between">
+                            <span>収支試算結果</span>
+                            <span class="text-xs font-normal text-bakery-500">おすすめ価格適用時</span>
+                        </h3>
+
+                        <div class="space-y-2.5 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-bakery-600 text-xs">持参パン総個数</span>
+                                <span class="font-bold text-bakery-900" x-text="totalQuantity + ' 個'"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-bakery-600 text-xs">完売時・見込み総売上</span>
+                                <span class="font-bold text-bakery-900 text-base" x-text="formatYen(totalSalesRevenue)"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-bakery-600 text-xs">原価合計 (材料＋包材)</span>
+                                <span class="font-semibold text-gray-600" x-text="formatYen(totalProductCosts)"></span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-bakery-600 text-xs">出店料＋交通費</span>
+                                <span class="font-semibold text-gray-600" x-text="formatYen(event.entryFee + event.expenses)"></span>
+                            </div>
+                            <div class="border-t border-bakery-100 pt-2 flex justify-between items-center font-bold">
+                                <span class="text-bakery-800 text-xs">手元に残る手取り利益</span>
+                                <span class="text-lg" :class="netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'" x-text="formatYen(netProfit)"></span>
+                            </div>
+                        </div>
+
+                        <!-- Target Wage Achievement -->
+                        <div class="bg-bakery-50 p-3 rounded-xl border border-bakery-100 text-xs space-y-1">
+                            <div class="flex justify-between font-medium">
+                                <span>目標日当の達成率</span>
+                                <span x-text="targetAchievementRate + '%'"></span>
+                            </div>
+                            <div class="w-full bg-bakery-200 h-2.5 rounded-full overflow-hidden">
+                                <div class="bg-bakery-600 h-full rounded-full transition-all duration-500" :style="`width: ${Math.min(targetAchievementRate, 100)}%`"></div>
+                            </div>
+                        </div>
+
+                        <!-- Save as History Button -->
+                        <div class="pt-2">
+                            <button @click="saveCurrentEventToHistory()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+                                💾 この試算・実績を出店記録に保存する
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: EVENT HISTORY & ACTUAL SALES -->
+        <div x-show="activeTab === 'history'" class="space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-bakery-200 shadow-sm space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-4 border-b border-bakery-100 pb-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-bakery-800">出店記録・実際の販売実績ログ</h2>
+                        <p class="text-xs text-bakery-600">過去のイベントごとに「実際に何個売れたか」「最終的な実際の売上・利益」を記録・分析できます。</p>
+                    </div>
+                </div>
+
+                <!-- History List -->
+                <div class="space-y-4">
+                    <template x-for="(record, rIdx) in eventHistory" :key="record.id">
+                        <div class="border border-bakery-200 rounded-2xl p-4 bg-bakery-50/50 space-y-3">
+                            <div class="flex flex-wrap justify-between items-center border-b border-bakery-200 pb-2 gap-2">
+                                <div>
+                                    <span class="text-xs text-bakery-500 font-medium" x-text="record.eventDate || '日付未入力'"></span>
+                                    <h3 class="font-bold text-base text-bakery-900" x-text="record.eventName || '無題の出店イベント'"></h3>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="text-right">
+                                        <span class="text-[10px] text-gray-500 block">実際の最終手取り利益</span>
+                                        <span class="font-bold text-base text-emerald-700" x-text="formatYen(calculateRecordActualProfit(record))"></span>
+                                    </div>
+                                    <button @click="deleteHistoryRecord(record.id)" class="text-gray-400 hover:text-red-500 p-1">✕</button>
+                                </div>
+                            </div>
+
+                            <!-- Record Items Breakdown -->
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs bg-white rounded-xl border border-bakery-200">
+                                    <thead class="bg-bakery-100 text-bakery-800">
+                                        <tr>
+                                            <th class="p-2 font-bold">出品パン名</th>
+                                            <th class="p-2 font-bold text-right">販売単価</th>
+                                            <th class="p-2 font-bold text-right">持参数</th>
+                                            <th class="p-2 font-bold text-right w-24">実販売数(個)</th>
+                                            <th class="p-2 font-bold text-right">実売上</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-bakery-100">
+                                        <template x-for="item in record.items" :key="item.recipeId">
+                                            <tr>
+                                                <td class="p-2 font-medium text-bakery-900" x-text="item.name"></td>
+                                                <td class="p-2 text-right" x-text="formatYen(item.recommendedPrice)"></td>
+                                                <td class="p-2 text-right text-gray-500" x-text="item.quantity + '個'"></td>
+                                                <td class="p-2 text-right">
+                                                    <input type="number" min="0" :max="item.quantity" x-model.number="item.actualSold" @input="saveHistoryToStorage()" class="w-16 px-1.5 py-1 border border-bakery-300 rounded font-bold text-right bg-amber-50">
+                                                </td>
+                                                <td class="p-2 text-right font-bold text-bakery-800" x-text="formatYen(item.recommendedPrice * (Number(item.actualSold) || 0))"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Record Summary Footer -->
+                            <div class="flex flex-wrap justify-between items-center text-xs bg-white p-3 rounded-xl border border-bakery-100">
+                                <div class="space-x-3 text-gray-600">
+                                    <span>出店料: <strong x-text="formatYen(record.entryFee)"></strong></span>
+                                    <span>経費: <strong x-text="formatYen(record.expenses)"></strong></span>
+                                    <span>総原価: <strong x-text="formatYen(calculateRecordTotalCost(record))"></strong></span>
+                                </div>
+                                <div class="font-bold text-bakery-900">
+                                    <span>実際の総売上: <strong class="text-sm text-bakery-800" x-text="formatYen(calculateRecordActualSales(record))"></strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="eventHistory.length === 0">
+                        <div class="text-center py-8 text-xs text-bakery-500 border-2 border-dashed border-bakery-200 rounded-xl">
+                            まだ保存された出店記録がありません。<br>「マルシェ出店計算」画面の右下にある「この試算・実績を出店記録に保存する」ボタンを押すと記録できます。
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: RECIPE MANAGEMENT -->
+        <div x-show="activeTab === 'recipes'" class="space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-bakery-200 shadow-sm space-y-4">
+                <div class="flex justify-between items-center border-b border-bakery-100 pb-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-bakery-800">パンレシピ管理</h2>
+                        <p class="text-xs text-bakery-600">作ったパンの材料と個数を登録しておくと、1個あたりの原価が自動更新されます。</p>
+                    </div>
+                    <button @click="openRecipeModal()" class="bg-bakery-700 hover:bg-bakery-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        ＋ 新しいパンレシピ作成
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="recipe in recipes" :key="recipe.id">
+                        <div class="border border-bakery-200 rounded-2xl p-4 bg-bakery-50/50 space-y-3 hover:border-bakery-300 transition flex flex-col justify-between">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-bold text-bakery-900 text-sm" x-text="recipe.name"></h3>
+                                    <div class="flex items-center gap-1">
+                                        <button @click="copyRecipe(recipe)" class="text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 text-xs font-bold transition" title="このレシピをコピーして新しいパンを作成">複製</button>
+                                        <button @click="openRecipeModal(recipe)" class="text-bakery-600 hover:text-bakery-800 p-1 text-xs font-medium">編集</button>
+                                        <button @click="deleteRecipe(recipe.id)" class="text-gray-400 hover:text-red-500 p-1 text-xs">削除</button>
+                                    </div>
+                                </div>
+                                <div class="text-xs space-y-1 text-bakery-700">
+                                    <div class="flex justify-between">
+                                        <span>1回仕込み焼き上がり個数:</span>
+                                        <span class="font-bold" x-text="recipe.yieldCount + ' 個'"></span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>1仕込み総原価 (材料＋包材):</span>
+                                        <span class="font-bold" x-text="formatYen(recipe.totalBatchIngredientCost)"></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-amber-100/70 p-2.5 rounded-xl border border-amber-200 flex justify-between items-center text-xs">
+                                <span class="font-bold text-amber-900">1個当たり原価:</span>
+                                <span class="text-base font-extrabold text-amber-900" x-text="formatYen(recipe.unitCost)"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: INGREDIENT MASTER DB -->
+        <div x-show="activeTab === 'ingredients'" class="space-y-6">
+            <div class="bg-white p-5 rounded-2xl border border-bakery-200 shadow-sm space-y-4">
+                <div class="flex justify-between items-center border-b border-bakery-100 pb-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-bakery-800">材料・資材マスター DB</h2>
+                        <p class="text-xs text-bakery-600">購入時の値段と内容量を登録すると、1g・1枚あたりの単価が自動計算されます。</p>
+                    </div>
+                    <button @click="openIngredientModal()" class="bg-bakery-700 hover:bg-bakery-800 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        ＋ 新規材料・資材の追加
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-bakery-100 text-bakery-800 border-b border-bakery-200">
+                            <tr>
+                                <th class="p-2.5 font-bold">区分</th>
+                                <th class="p-2.5 font-bold">名称</th>
+                                <th class="p-2.5 font-bold text-right">購入価格</th>
+                                <th class="p-2.5 font-bold text-right">内容量</th>
+                                <th class="p-2.5 font-bold text-right">算出単価</th>
+                                <th class="p-2.5 font-bold text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-bakery-100">
+                            <template x-for="ing in masterIngredients" :key="ing.id">
+                                <tr class="hover:bg-bakery-50/50 transition">
+                                    <td class="p-2.5 font-medium">
+                                        <span :class="ing.category === '包材・型' ? 'bg-amber-100 text-amber-800' : 'bg-bakery-200 text-bakery-900'" class="px-2 py-0.5 rounded-full text-[10px]" x-text="ing.category"></span>
+                                    </td>
+                                    <td class="p-2.5 font-bold text-bakery-900" x-text="ing.name"></td>
+                                    <td class="p-2.5 text-right font-medium" x-text="formatYen(ing.price)"></td>
+                                    <td class="p-2.5 text-right" x-text="ing.capacity + ' ' + ing.unit"></td>
+                                    <td class="p-2.5 text-right font-bold text-bakery-700" x-text="'￥' + (ing.price / ing.capacity).toFixed(2) + ' /' + ing.unit"></td>
+                                    <td class="p-2.5 text-center">
+                                        <div class="flex items-center justify-center gap-1">
+                                            <button @click="editIngredient(ing)" class="p-1 text-bakery-600 hover:text-bakery-800">✎</button>
+                                            <button @click="deleteIngredient(ing.id)" class="p-1 text-gray-400 hover:text-red-500">✕</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: GUIDE SHEET -->
+        <div x-show="activeTab === 'guide'" class="space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-bakery-200 shadow-sm space-y-8 max-w-4xl mx-auto">
+                <div class="border-b border-bakery-200 pb-4 text-center space-y-2">
+                    <div class="flex justify-center gap-3 text-bakery-700">
+                        <svg class="w-8 h-8 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v8M8 12h8" />
+                        </svg>
+                        <svg class="w-8 h-8 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-bakery-900">ツールの使い方 & マルシェ価格設定ガイド</h2>
+                    <p class="text-xs text-bakery-600">シミュレーターの基本操作から、失敗しない値段付けのコツ・レシピ帳活用法までやさしく解説しています。</p>
+                </div>
+
+                <!-- SECTION 1: HOW TO USE THIS TOOL -->
+                <div class="space-y-3">
+                    <h3 class="text-sm font-bold text-bakery-900 flex items-center gap-2 border-l-4 border-bakery-600 pl-2">
+                        <span>シミュレーターの基本の使い方</span>
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        <div class="bg-bakery-50 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2 font-bold text-bakery-800">
+                                <svg class="w-5 h-5 text-bakery-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                <span>① 材料マスターを登録</span>
+                            </div>
+                            <p class="text-bakery-700 leading-relaxed">普段使う粉やバター、個包装用のパン袋や紙型の買値と内容量を登録しておきます。</p>
+                        </div>
+                        <div class="bg-bakery-50 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2 font-bold text-bakery-800">
+                                <svg class="w-5 h-5 text-bakery-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9z"/></svg>
+                                <span>② パンレシピを作成</span>
+                            </div>
+                            <p class="text-bakery-700 leading-relaxed">レシピ名と使用材料を選ぶだけで、仕込みの材料・資材代とパン1個あたりの原価が自動計算されます。</p>
+                        </div>
+                        <div class="bg-bakery-50 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2 font-bold text-bakery-800">
+                                <svg class="w-5 h-5 text-bakery-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
+                                <span>③ 出店イベントを設定</span>
+                            </div>
+                            <p class="text-bakery-700 leading-relaxed">マルシェの出店料や交通費、目標日当（時給と作業時間から算出）を入力します。</p>
+                        </div>
+                        <div class="bg-bakery-50 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2 font-bold text-bakery-800">
+                                <svg class="w-5 h-5 text-bakery-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0z"/></svg>
+                                <span>④ 出品パンと個数を選択</span>
+                            </div>
+                            <p class="text-bakery-700 leading-relaxed">持参するパンと個数を選ぶと、おすすめ価格と手取り利益が一瞬で表示されます。</p>
+                        </div>
+                        <div class="bg-bakery-50 p-4 rounded-xl border border-bakery-200 space-y-2 sm:col-span-2 md:col-span-2">
+                            <div class="flex items-center gap-2 font-bold text-bakery-800">
+                                <svg class="w-5 h-5 text-bakery-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/></svg>
+                                <span>⑤ 当日の実績を記録・保存</span>
+                            </div>
+                            <p class="text-bakery-700 leading-relaxed">出店記録に保存しておくと、後から実際に売れた個数を入力できます。次回出店のデータとして役立ちます。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: 4 PRICE SETTING CONCEPTS -->
+                <div class="space-y-3 pt-2">
+                    <h3 class="text-sm font-bold text-bakery-900 flex items-center gap-2 border-l-4 border-amber-500 pl-2">
+                        <span>価格設定 4つの安心心得</span>
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Card 1 -->
+                        <div class="bg-bakery-50/80 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-bakery-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                                <h4 class="font-bold text-bakery-900 text-sm">原価の3倍を目指す理由</h4>
+                            </div>
+                            <p class="text-xs text-bakery-700 leading-relaxed">
+                                パン販売には材料費だけでなく、包材費・出店料・交通費、そして仕込みや販売にかかる時間が発生します。原価の3倍（原価率およそ33%）で販売することで、手元にしっかりと手当を残すことができます。
+                            </p>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="bg-amber-50/80 p-4 rounded-xl border border-amber-200 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-amber-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                                <h4 class="font-bold text-amber-900 text-sm">赤字を出さない安全基準（2.5倍/40%）</h4>
+                            </div>
+                            <p class="text-xs text-amber-800 leading-relaxed">
+                                利益は少なくても持ち出し（赤字）を避けたい場合は、原価の2.5倍（原価率40%前後）を設定基準にしてください。万が一売れ残りがでても、出店料と材料費を回収しやすい設定です。
+                            </p>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="bg-bakery-50/80 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-bakery-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+                                <h4 class="font-bold text-bakery-900 text-sm">出店料・交通費の回収方法</h4>
+                            </div>
+                            <p class="text-xs text-bakery-700 leading-relaxed">
+                                出店料などの固定費は、持ち込むパン全体で少しずつ均等に回収します。持参個数を入力すると、完売時に固定費が確実に回収できる価格が自動で提案されます。
+                            </p>
+                        </div>
+
+                        <!-- Card 4 -->
+                        <div class="bg-bakery-50/80 p-4 rounded-xl border border-bakery-200 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-bakery-700 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">4</span>
+                                <h4 class="font-bold text-bakery-900 text-sm">目標日当（人件費）の考え方</h4>
+                            </div>
+                            <p class="text-xs text-bakery-700 leading-relaxed">
+                                買い出し・仕込み・当日の作業時間（合計10時間など）に目標時給（1,000円など）を掛け合わせた金額を目標日当に入力します。完売時に達成率100%になるか試算が可能です。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: BAKER'S PERCENT & RECIPE BOOK GUIDE -->
+                <div class="space-y-3 pt-2">
+                    <h3 class="text-sm font-bold text-bakery-900 flex items-center gap-2 border-l-4 border-emerald-500 pl-2">
+                        <span>デジタルレシピ帳 & ベーカーズパーセントの活用法</span>
+                    </h3>
+                    <div class="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200 space-y-3 text-xs">
+                        <div class="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                            <svg class="w-5 h-5 text-emerald-700 stroke-current" fill="none" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                            <span>粉の量を変更するだけで全材料の分量が自動で連動します</span>
+                        </div>
+                        <p class="text-emerald-800 leading-relaxed">
+                            このツールは原価計算だけでなく、普段のパン作りをサポートするデジタルレシピ帳としても利用できます。
+                        </p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div class="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-1">
+                                <span class="font-bold text-emerald-900 block">ベーカーズパーセント（比率）とは</span>
+                                <p class="text-gray-700 text-[11px] leading-relaxed">
+                                    小麦粉や米粉などの主原料の総量を「100%」とし、イーストや砂糖・水分が何%入っているかを表すパン作りの比率ルールです。
+                                </p>
+                            </div>
+                            <div class="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-1">
+                                <span class="font-bold text-emerald-900 block">多めの仕込みも一発で計算</span>
+                                <p class="text-gray-700 text-[11px] leading-relaxed">
+                                    レシピ編集画面でメインの粉の量（300gから500gなど）を変更すると、比率を保ったまま全材料のグラム数が一瞬で拡大・縮小されます。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL 1: ADD BREAD TO MARCHE SELECTION -->
+    <div x-show="showAddBreadMarcheModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 class="text-lg font-bold text-bakery-800">マルシェに出品するパンの選択</h3>
+            <div class="space-y-2 max-h-60 overflow-y-auto">
+                <template x-for="r in recipes" :key="r.id">
+                    <div class="flex items-center justify-between p-3 border border-bakery-200 rounded-xl hover:bg-bakery-50 transition">
+                        <div>
+                            <span class="font-bold text-bakery-900 text-xs block" x-text="r.name"></span>
+                            <span class="text-[10px] text-bakery-600" x-text="'1個原価: ' + formatYen(r.unitCost)"></span>
+                        </div>
+                        <button @click="toggleSelectBreadForMarche(r.id)" class="px-3 py-1 rounded-lg text-xs font-bold transition" :class="isBreadSelectedInMarche(r.id) ? 'bg-red-100 text-red-700' : 'bg-bakery-600 text-white'">
+                            <span x-text="isBreadSelectedInMarche(r.id) ? '外す' : '追加'"></span>
+                        </button>
+                    </div>
+                </template>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button @click="showAddBreadMarcheModal = false" class="px-4 py-2 bg-bakery-700 text-white rounded-xl text-xs font-bold">完了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: INGREDIENT MASTER EDIT MODAL -->
+    <div x-show="showIngredientModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 class="text-lg font-bold text-bakery-800" x-text="editingIngredient.id ? '材料マスターの編集' : '新しい材料の登録'"></h3>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-bold mb-1">区分</label>
+                    <select x-model="editingIngredient.category" class="w-full border border-bakery-300 p-2 rounded-xl">
+                        <option value="材料">材料 (粉、酵母、砂糖、具材等)</option>
+                        <option value="包材・型">包材・使い捨て型 (パン袋、シール、紙型等)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold mb-1">材料・資材名</label>
+                    <input type="text" x-model="editingIngredient.name" class="w-full border border-bakery-300 p-2 rounded-xl" placeholder="例：ミニパウンド紙型(50枚入)">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold mb-1">購入価格 (円)</label>
+                        <input type="number" min="0" x-model.number="editingIngredient.price" class="w-full border border-bakery-300 p-2 rounded-xl text-right">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-1">内容量</label>
+                        <div class="flex gap-1">
+                            <input type="number" min="1" x-model.number="editingIngredient.capacity" class="w-full border border-bakery-300 p-2 rounded-xl text-right">
+                            <select x-model="editingIngredient.unit" class="border border-bakery-300 p-2 rounded-xl">
+                                <option value="g">g</option>
+                                <option value="kg">kg</option>
+                                <option value="ml">ml</option>
+                                <option value="枚">枚</option>
+                                <option value="個">個</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button @click="showIngredientModal = false" class="px-4 py-2 border rounded-xl text-xs">キャンセル</button>
+                <button @click="saveIngredient()" class="px-4 py-2 bg-bakery-600 text-white rounded-xl text-xs font-bold">登録する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: RECIPE EDIT MODAL -->
+    <div x-show="showRecipeModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-bold text-bakery-800" x-text="editingRecipe.id ? 'レシピの編集' : '新規レシピ作成'"></h3>
+            
+            <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block font-bold mb-1">パンの名前</label>
+                        <input type="text" x-model="editingRecipe.name" class="w-full border border-bakery-300 p-2 rounded-xl" placeholder="例：米粉の塩バターパン">
+                    </div>
+                    <div>
+                        <label class="block font-bold mb-1">焼き上がり個数</label>
+                        <div class="flex items-center gap-1">
+                            <input type="number" min="1" x-model.number="editingRecipe.yieldCount" @input="recalcRecipeModal()" class="w-full border border-bakery-300 p-2 rounded-xl text-right font-bold">
+                            <span>個</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recipe Ingredients & Materials Table -->
+                <div class="space-y-2 border-t border-bakery-200 pt-3">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <span class="font-bold block text-bakery-900">使用材料・資材一覧</span>
+                            <span class="text-[10px] text-bakery-600">粉類を自動認識してベーカーズパーセントを表示します</span>
+                        </div>
+                        <button @click="addIngredientToRecipe()" class="bg-bakery-100 hover:bg-bakery-200 text-bakery-800 px-2.5 py-1 rounded-lg font-bold text-xs border border-bakery-300">＋ 行を追加</button>
+                    </div>
+
+                    <!-- Baker's % Total Flour Banner -->
+                    <template x-if="recipeTotalFlour > 0">
+                        <div class="bg-amber-50 p-2 rounded-xl border border-amber-200 text-xs flex justify-between items-center font-medium">
+                            <span class="text-amber-900">基準総粉量 (100%): <strong class="text-sm font-bold" x-text="recipeTotalFlour + ' g'"></strong></span>
+                            <span class="text-[11px] text-amber-700">粉量を変更すると他の材料も自動で比率計算されます</span>
+                        </div>
+                    </template>
+
+                    <div class="space-y-2">
+                        <template x-for="(ingItem, index) in editingRecipe.ingredients" :key="index">
+                            <div class="flex items-center gap-2">
+                                <select x-model.number="ingItem.masterId" @change="recalcRecipeModal()" class="flex-1 border border-bakery-300 p-1.5 rounded-lg text-xs">
+                                    <option value="">-- 材料・資材を選択 --</option>
+                                    <template x-for="m in masterIngredients" :key="m.id">
+                                        <option :value="m.id" x-text="m.name + ' (' + formatYen(m.price/m.capacity) + '/' + m.unit + ')'"></option>
+                                    </template>
+                                </select>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" min="0" x-model.number="ingItem.amount" @input="onIngredientAmountInput(index)" class="w-20 border border-bakery-300 p-1.5 rounded-lg text-right font-bold" placeholder="使用量">
+                                    <span class="w-6 text-[11px] text-gray-500" x-text="getIngredientUnit(ingItem.masterId)"></span>
+                                </div>
+                                <!-- Baker's % Display Tag -->
+                                <div class="w-14 text-right">
+                                    <span x-text="calculateBakersPercent(ingItem)" class="text-[11px] font-bold px-1.5 py-0.5 rounded" :class="isFlourIngredient(ingItem.masterId) ? 'bg-amber-200 text-amber-900' : 'bg-gray-100 text-gray-700'"></span>
+                                </div>
+                                <button @click="removeIngredientFromRecipe(index)" class="text-gray-400 hover:text-red-500 p-1">✕</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Recipe Modal Calculated Summary -->
+                <div class="bg-amber-50 p-3 rounded-xl border border-amber-200 space-y-1 font-medium">
+                    <div class="flex justify-between">
+                        <span>1仕込み合計コスト (材料＋資材):</span>
+                        <span class="font-bold text-amber-900" x-text="formatYen(modalCalc.totalBatchCost)"></span>
+                    </div>
+                    <div class="flex justify-between text-sm font-bold border-t border-amber-200/60 pt-1">
+                        <span>自動計算後の1個あたり原価:</span>
+                        <span class="text-amber-900 text-base" x-text="formatYen(modalCalc.unitCost)"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-bakery-100">
+                <button @click="showRecipeModal = false" class="px-4 py-2 border rounded-xl text-xs">キャンセル</button>
+                <button @click="saveRecipe()" class="px-4 py-2 bg-bakery-600 text-white rounded-xl text-xs font-bold">保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alpine.js Application Logic -->
+    <script>
+        function bakeryCalculator() {
+            return {
+                activeTab: 'marche',
+                roundingUnit: 50,
+                globalMultiplier: 3.0,
+                
+                // Event costs
+                event: {
+                    eventName: 'パンマルシェ 2026',
+                    eventDate: new Date().toISOString().slice(0, 10),
+                    entryFee: 5000,
+                    expenses: 1500,
+                    targetWage: 10000
+                },
+
+                // Modals
+                showRecipeModal: false,
+                showIngredientModal: false,
+                showAddBreadMarcheModal: false,
+
+                // History Records
+                eventHistory: [],
+
+                // Edit states
+                editingIngredient: { id: null, category: '材料', name: '', price: 0, capacity: 1000, unit: 'g' },
+                editingRecipe: { id: null, name: '', yieldCount: 10, ingredients: [] },
+                modalCalc: { totalBatchCost: 0, unitCost: 0 },
+                recipeTotalFlour: 0,
+
+                // Master Ingredients
+                masterIngredients: [
+                    { id: 1, category: '材料', name: '強力粉 (春よ恋)', price: 1800, capacity: 2500, unit: 'g' },
+                    { id: 2, category: '材料', name: '無塩バター', price: 950, capacity: 450, unit: 'g' },
+                    { id: 3, category: '材料', name: 'ドライイースト', price: 650, capacity: 500, unit: 'g' },
+                    { id: 4, category: '材料', name: 'きび砂糖', price: 380, capacity: 750, unit: 'g' },
+                    { id: 5, category: '包材・型', name: '個包装用パン袋', price: 450, capacity: 100, unit: '枚' },
+                    { id: 6, category: '包材・型', name: 'ミニパウンド紙型', price: 800, capacity: 50, unit: '枚' },
+                ],
+
+                // Saved Recipes
+                recipes: [
+                    {
+                        id: 101,
+                        name: '米粉の塩バターパン',
+                        yieldCount: 10,
+                        totalBatchIngredientCost: 470,
+                        unitCost: 47,
+                        ingredients: [{ masterId: 1, amount: 300 }, { masterId: 2, amount: 60 }, { masterId: 5, amount: 10 }]
+                    },
+                    {
+                        id: 102,
+                        name: '手作りふんわりメロンパン',
+                        yieldCount: 10,
+                        totalBatchIngredientCost: 490,
+                        unitCost: 49,
+                        ingredients: [{ masterId: 1, amount: 250 }, { masterId: 2, amount: 40 }, { masterId: 5, amount: 10 }]
+                    }
+                ],
+
+                // Selected Breads for Marche
+                selectedMarcheItems: [],
+
+                // Calculation Results
+                totalFixedCosts: 0,
+                totalQuantity: 0,
+                totalSalesRevenue: 0,
+                totalProductCosts: 0,
+                totalGrossProfit: 0,
+                netProfit: 0,
+                targetAchievementRate: 0,
+                isTargetCovered: false,
+
+                initData() {
+                    const savedIngs = localStorage.getItem('bakery_master_ingredients');
+                    if (savedIngs) this.masterIngredients = JSON.parse(savedIngs);
+
+                    const savedRecipes = localStorage.getItem('bakery_recipes');
+                    if (savedRecipes) this.recipes = JSON.parse(savedRecipes);
+
+                    const savedHistory = localStorage.getItem('bakery_event_history');
+                    if (savedHistory) this.eventHistory = JSON.parse(savedHistory);
+
+                    // Initial default items for Marche
+                    if (this.recipes.length > 0) {
+                        this.selectedMarcheItems = [
+                            { recipeId: this.recipes[0].id, name: this.recipes[0].name, unitCost: this.recipes[0].unitCost, multiplier: 3.0, targetCostRatio: 33, quantity: 40, recommendedPrice: 0, actualCostRatio: 0 },
+                            { recipeId: this.recipes[1]?.id || this.recipes[0].id, name: this.recipes[1]?.name || this.recipes[0].name, unitCost: this.recipes[1]?.unitCost || this.recipes[0].unitCost, multiplier: 3.0, targetCostRatio: 33, quantity: 20, recommendedPrice: 0, actualCostRatio: 0 }
+                        ];
+                    }
+                    this.calculate();
+                },
+
+                saveIngredientsToStorage() {
+                    localStorage.setItem('bakery_master_ingredients', JSON.stringify(this.masterIngredients));
+                },
+
+                saveRecipesToStorage() {
+                    localStorage.setItem('bakery_recipes', JSON.stringify(this.recipes));
+                },
+
+                saveHistoryToStorage() {
+                    localStorage.setItem('bakery_event_history', JSON.stringify(this.eventHistory));
+                },
+
+                applyGlobalMultiplier() {
+                    if (this.globalMultiplier > 0) {
+                        this.selectedMarcheItems.forEach(item => {
+                            item.multiplier = this.globalMultiplier;
+                            item.targetCostRatio = Math.round(100 / this.globalMultiplier);
+                        });
+                        this.calculate();
+                    }
+                },
+
+                updateFromMultiplier(item) {
+                    if (item.multiplier > 0) {
+                        item.targetCostRatio = Math.round(100 / item.multiplier);
+                    }
+                    this.calculate();
+                },
+
+                updateFromCostRatio(item) {
+                    if (item.targetCostRatio > 0) {
+                        item.multiplier = Number((100 / item.targetCostRatio).toFixed(1));
+                    }
+                    this.calculate();
+                },
+
+                calculate() {
+                    this.totalFixedCosts = (Number(this.event.entryFee) || 0) + (Number(this.event.expenses) || 0) + (Number(this.event.targetWage) || 0);
+                    
+                    let qty = 0;
+                    let sales = 0;
+                    let prodCosts = 0;
+
+                    this.selectedMarcheItems.forEach(item => {
+                        const rawPrice = item.unitCost * item.multiplier;
+                        let roundedPrice = rawPrice;
+                        if (this.roundingUnit === 50) {
+                            roundedPrice = Math.ceil(rawPrice / 50) * 50;
+                        } else {
+                            roundedPrice = Math.ceil(rawPrice / 10) * 10;
+                        }
+                        item.recommendedPrice = roundedPrice;
+                        item.actualCostRatio = roundedPrice > 0 ? Math.round((item.unitCost / roundedPrice) * 100) : 0;
+
+                        const itemQty = Number(item.quantity) || 0;
+                        qty += itemQty;
+                        sales += roundedPrice * itemQty;
+                        prodCosts += item.unitCost * itemQty;
+                    });
+
+                    this.totalQuantity = qty;
+                    this.totalSalesRevenue = sales;
+                    this.totalProductCosts = prodCosts;
+                    this.totalGrossProfit = sales - prodCosts;
+                    
+                    const eventCost = (Number(this.event.entryFee) || 0) + (Number(this.event.expenses) || 0);
+                    this.netProfit = this.totalGrossProfit - eventCost;
+
+                    const targetWage = Number(this.event.targetWage) || 0;
+                    if (targetWage > 0) {
+                        this.targetAchievementRate = Math.min(100, Math.round((this.netProfit / targetWage) * 100));
+                    } else {
+                        this.targetAchievementRate = 100;
+                    }
+
+                    this.isTargetCovered = this.netProfit >= targetWage;
+                },
+
+                saveCurrentEventToHistory() {
+                    const record = {
+                        id: Date.now(),
+                        eventName: this.event.eventName || 'マルシェ出店',
+                        eventDate: this.event.eventDate || new Date().toISOString().slice(0, 10),
+                        entryFee: Number(this.event.entryFee) || 0,
+                        expenses: Number(this.event.expenses) || 0,
+                        targetWage: Number(this.event.targetWage) || 0,
+                        items: JSON.parse(JSON.stringify(this.selectedMarcheItems)).map(i => ({
+                            ...i,
+                            actualSold: '' // 最初は空欄にしておき、イベント終了後に実際の販売数を手入力できるように変更
+                        }))
+                    };
+                    this.eventHistory.unshift(record);
+                    this.saveHistoryToStorage();
+                    this.activeTab = 'history';
+                    alert('出店記録に保存しました！イベント終了後に「出店記録・実績ログ」タブで実際の販売数を入力してください。');
+                },
+
+                calculateRecordActualSales(record) {
+                    return record.items.reduce((sum, item) => sum + (item.recommendedPrice * (Number(item.actualSold) || 0)), 0);
+                },
+
+                calculateRecordTotalCost(record) {
+                    return record.items.reduce((sum, item) => sum + (item.unitCost * (Number(item.quantity) || 0)), 0);
+                },
+
+                calculateRecordActualProfit(record) {
+                    const sales = this.calculateRecordActualSales(record);
+                    const prodCost = this.calculateRecordTotalCost(record);
+                    const eventCost = record.entryFee + record.expenses;
+                    return sales - prodCost - eventCost;
+                },
+
+                deleteHistoryRecord(id) {
+                    this.eventHistory = this.eventHistory.filter(h => h.id !== id);
+                    this.saveHistoryToStorage();
+                },
+
+                // INGREDIENT ACTIONS
+                openIngredientModal(ing = null) {
+                    if (ing) {
+                        this.editingIngredient = JSON.parse(JSON.stringify(ing));
+                    } else {
+                        this.editingIngredient = { id: null, category: '材料', name: '', price: 0, capacity: 1000, unit: 'g' };
+                    }
+                    this.showIngredientModal = true;
+                },
+
+                saveIngredient() {
+                    if (!this.editingIngredient.name) {
+                        alert('材料・資材名を入力してください。');
+                        return;
+                    }
+                    if (this.editingIngredient.id) {
+                        const idx = this.masterIngredients.findIndex(m => m.id === this.editingIngredient.id);
+                        if (idx !== -1) this.masterIngredients[idx] = JSON.parse(JSON.stringify(this.editingIngredient));
+                    } else {
+                        this.editingIngredient.id = Date.now();
+                        this.masterIngredients.push(JSON.parse(JSON.stringify(this.editingIngredient)));
+                    }
+                    this.saveIngredientsToStorage();
+                    this.showIngredientModal = false;
+                },
+
+                editIngredient(ing) {
+                    this.openIngredientModal(ing);
+                },
+
+                deleteIngredient(id) {
+                    this.masterIngredients = this.masterIngredients.filter(m => m.id !== id);
+                    this.saveIngredientsToStorage();
+                },
+
+                // RECIPE ACTIONS
+                openRecipeModal(recipe = null) {
+                    if (recipe) {
+                        this.editingRecipe = JSON.parse(JSON.stringify(recipe));
+                    } else {
+                        this.editingRecipe = { id: null, name: '', yieldCount: 10, ingredients: [] };
+                    }
+                    this.recalcRecipeModal();
+                    this.showRecipeModal = true;
+                },
+
+                copyRecipe(recipe) {
+                    const copied = JSON.parse(JSON.stringify(recipe));
+                    copied.id = null;
+                    copied.name = recipe.name + ' のコピー';
+                    this.openRecipeModal(copied);
+                },
+
+                addIngredientToRecipe() {
+                    this.editingRecipe.ingredients.push({ masterId: '', amount: 0 });
+                },
+
+                removeIngredientFromRecipe(index) {
+                    this.editingRecipe.ingredients.splice(index, 1);
+                    this.recalcRecipeModal();
+                },
+
+                getIngredientUnit(masterId) {
+                    const m = this.masterIngredients.find(item => item.id == masterId);
+                    return m ? m.unit : '';
+                },
+
+                isFlourIngredient(masterId) {
+                    const m = this.masterIngredients.find(item => item.id == masterId);
+                    if (!m) return false;
+                    return m.name.includes('粉') || m.name.toLowerCase().includes('flour');
+                },
+
+                calculateTotalFlour() {
+                    let totalFlour = 0;
+                    if (this.editingRecipe.ingredients) {
+                        this.editingRecipe.ingredients.forEach(item => {
+                            if (this.isFlourIngredient(item.masterId) && getIngredientUnit(item.masterId) === 'g') {
+                                totalFlour += Number(item.amount) || 0;
+                            }
+                        });
+                    }
+                    return totalFlour;
+                },
+
+                calculateBakersPercent(ingItem) {
+                    const m = this.masterIngredients.find(item => item.id == ingItem.masterId);
+                    if (!m || m.unit !== 'g') return '-';
+                    const totalFlour = this.recipeTotalFlour;
+                    if (totalFlour <= 0) return '-';
+                    const pct = ((Number(ingItem.amount) || 0) / totalFlour) * 100;
+                    return pct.toFixed(1) + '%';
+                },
+
+                onIngredientAmountInput(changedIndex) {
+                    const changedItem = this.editingRecipe.ingredients[changedIndex];
+                    if (changedItem && this.isFlourIngredient(changedItem.masterId)) {
+                        const oldTotalFlour = this.recipeTotalFlour;
+                        let newTotalFlour = 0;
+                        this.editingRecipe.ingredients.forEach(item => {
+                            if (this.isFlourIngredient(item.masterId) && this.getIngredientUnit(item.masterId) === 'g') {
+                                newTotalFlour += Number(item.amount) || 0;
+                            }
+                        });
+
+                        // If total flour changed, scale all other g-based ingredients accordingly
+                        if (oldTotalFlour > 0 && newTotalFlour > 0 && oldTotalFlour !== newTotalFlour) {
+                            const ratio = newTotalFlour / oldTotalFlour;
+                            this.editingRecipe.ingredients.forEach((item, idx) => {
+                                if (idx !== changedIndex && this.getIngredientUnit(item.masterId) === 'g') {
+                                    item.amount = Math.round((Number(item.amount) || 0) * ratio * 10) / 10;
+                                }
+                            });
+                        }
+                    }
+                    this.recalcRecipeModal();
+                },
+
+                recalcRecipeModal() {
+                    let totalBatch = 0;
+                    let totalFlour = 0;
+
+                    if (this.editingRecipe.ingredients) {
+                        this.editingRecipe.ingredients.forEach(item => {
+                            const master = this.masterIngredients.find(m => m.id == item.masterId);
+                            if (master && master.capacity > 0) {
+                                const unitPrice = master.price / master.capacity;
+                                totalBatch += unitPrice * (Number(item.amount) || 0);
+                            }
+                            if (master && (master.name.includes('粉') || master.name.toLowerCase().includes('flour')) && master.unit === 'g') {
+                                totalFlour += Number(item.amount) || 0;
+                            }
+                        });
+                    }
+
+                    this.recipeTotalFlour = totalFlour;
+                    this.modalCalc.totalBatchCost = Math.round(totalBatch);
+                    const yieldCount = Number(this.editingRecipe.yieldCount) || 1;
+                    this.modalCalc.unitCost = Math.round(totalBatch / yieldCount);
+                },
+
+                saveRecipe() {
+                    if (!this.editingRecipe.name) {
+                        alert('パンの名前を入力してください。');
+                        return;
+                    }
+                    this.editingRecipe.totalBatchIngredientCost = this.modalCalc.totalBatchCost;
+                    this.editingRecipe.unitCost = this.modalCalc.unitCost;
+
+                    if (this.editingRecipe.id) {
+                        const idx = this.recipes.findIndex(r => r.id === this.editingRecipe.id);
+                        if (idx !== -1) this.recipes[idx] = JSON.parse(JSON.stringify(this.editingRecipe));
+                    } else {
+                        this.editingRecipe.id = Date.now();
+                        this.recipes.push(JSON.parse(JSON.stringify(this.editingRecipe)));
+                    }
+                    this.saveRecipesToStorage();
+
+                    // Update selected items in Marche list
+                    this.selectedMarcheItems.forEach(item => {
+                        if (item.recipeId === this.editingRecipe.id) {
+                            item.name = this.editingRecipe.name;
+                            item.unitCost = this.editingRecipe.unitCost;
+                        }
+                    });
+                    this.calculate();
+                    this.showRecipeModal = false;
+                },
+
+                deleteRecipe(id) {
+                    this.recipes = this.recipes.filter(r => r.id !== id);
+                    this.selectedMarcheItems = this.selectedMarcheItems.filter(i => i.recipeId !== id);
+                    this.saveRecipesToStorage();
+                    this.calculate();
+                },
+
+                // MARCHE SELECTION ACTIONS
+                removeBreadFromMarche(index) {
+                    this.selectedMarcheItems.splice(index, 1);
+                    this.calculate();
+                },
+
+                isBreadSelectedInMarche(recipeId) {
+                    return this.selectedMarcheItems.some(i => i.recipeId === recipeId);
+                },
+
+                toggleSelectBreadForMarche(recipeId) {
+                    const idx = this.selectedMarcheItems.findIndex(i => i.recipeId === recipeId);
+                    if (idx !== -1) {
+                        this.selectedMarcheItems.splice(idx, 1);
+                    } else {
+                        const r = this.recipes.find(rec => rec.id === recipeId);
+                        if (r) {
+                            this.selectedMarcheItems.push({
+                                recipeId: r.id,
+                                name: r.name,
+                                unitCost: r.unitCost,
+                                multiplier: this.globalMultiplier || 3.0,
+                                targetCostRatio: Math.round(100 / (this.globalMultiplier || 3.0)),
+                                quantity: 20,
+                                recommendedPrice: 0,
+                                actualCostRatio: 0
+                            });
+                        }
+                    }
+                    this.calculate();
+                },
+
+                // BACKUP / RESTORE DATA
+                exportData() {
+                    const data = {
+                        event: this.event,
+                        roundingUnit: this.roundingUnit,
+                        globalMultiplier: this.globalMultiplier,
+                        masterIngredients: this.masterIngredients,
+                        recipes: this.recipes,
+                        selectedMarcheItems: this.selectedMarcheItems,
+                        eventHistory: this.eventHistory
+                    };
+                    const jsonStr = JSON.stringify(data, null, 2);
+                    const blob = new Blob([jsonStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `marche_bakery_data_${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                importData(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (data.masterIngredients) this.masterIngredients = data.masterIngredients;
+                            if (data.recipes) this.recipes = data.recipes;
+                            if (data.event) this.event = data.event;
+                            if (data.selectedMarcheItems) this.selectedMarcheItems = data.selectedMarcheItems;
+                            if (data.roundingUnit) this.roundingUnit = data.roundingUnit;
+                            if (data.globalMultiplier) this.globalMultiplier = data.globalMultiplier;
+                            if (data.eventHistory) this.eventHistory = data.eventHistory;
+
+                            this.saveIngredientsToStorage();
+                            this.saveRecipesToStorage();
+                            this.saveHistoryToStorage();
+                            this.calculate();
+                            alert('データを無事に正常インポート（復元）しました！');
+                        } catch (err) {
+                            alert('データの読み込みに失敗しました。正しいJSONファイルを選択してください。');
+                        }
+                    };
+                    reader.readAsText(file);
+                },
+
+                // UTILITY
+                formatYen(num) {
+                    return '￥' + (Math.round(num) || 0).toLocaleString();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
